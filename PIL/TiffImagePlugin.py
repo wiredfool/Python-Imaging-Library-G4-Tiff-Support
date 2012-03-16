@@ -523,7 +523,12 @@ class TiffImageFile(ImageFile.ImageFile):
         self.__frame = -1
         self.__fp = self.fp
 
-        # and load the first frame
+        if Image.DEBUG:
+            print "*** TiffImageFile._open ***"
+            print "- __first:", self.__first
+            print "- ifh: ", ifh
+
+       # and load the first frame
         self._seek(0)
 
     def seek(self, frame):
@@ -558,7 +563,7 @@ class TiffImageFile(ImageFile.ImageFile):
 
         return self.__frame
 
-    def _decoder(self, rawmode, layer):
+    def _decoder(self, rawmode, layer, tile=None, offset=0):
         "Setup decoder contexts"
 
         args = None
@@ -579,7 +584,22 @@ class TiffImageFile(ImageFile.ImageFile):
             if self.tag.has_key(317):
                 # Section 14: Differencing Predictor
                 self.decoderconfig = (self.tag[PREDICTOR][0],)
-
+        elif compression in ["tiff_ccitt", "group3", "group4", "tiff_raw_16"]:
+            if Image.DEBUG:
+                print "Activating g4 compression"
+                print "offset: %d" % offset
+            if offset:
+                curpos = self.fp.tell()
+                self.fp.seek(0)
+                self.tile_prefix = self.fp.read(offset)
+                self.fp.seek(curpos)
+            args = (rawmode,
+                    compression,
+                    (self.tag.has_key(FILLORDER)) \
+                    and self.tag[FILLORDER][0] or -1,
+                    (tile is not None and self.tag.has_key(STRIPBYTECOUNTS)) \
+                    and self.tag[STRIPBYTECOUNTS][tile] or -1)
+                
         if self.tag.has_key(ICCPROFILE):
             self.info['icc_profile'] = self.tag[ICCPROFILE]
 
@@ -660,16 +680,16 @@ class TiffImageFile(ImageFile.ImageFile):
         self.tile = []
         if self.tag.has_key(STRIPOFFSETS):
             # striped image
+            offsets = self.tag[STRIPOFFSETS]
             h = getscalar(ROWSPERSTRIP, ysize)
             w = self.size[0]
-            a = None
-            for o in self.tag[STRIPOFFSETS]:
-                if not a:
-                    a = self._decoder(rawmode, l)
+            for i in range(len(offsets)):
+                a = self._decoder(rawmode, l, i, offsets[i])
                 self.tile.append(
                     (self._compression,
                     (0, min(y, ysize), w, min(y+h, ysize)),
-                    o, a))
+                    offsets[i], a))
+                print "tiles: %s" % self.tile
                 y = y + h
                 if y >= self.size[1]:
                     x = y = 0

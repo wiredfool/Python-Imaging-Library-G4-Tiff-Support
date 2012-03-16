@@ -3109,6 +3109,7 @@ extern PyObject* PyImaging_GifDecoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_HexDecoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_JpegDecoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_TiffLzwDecoderNew(PyObject* self, PyObject* args);
+extern PyObject* PyImaging_LibTiffDecoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_MspDecoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_PackbitsDecoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_PcdDecoderNew(PyObject* self, PyObject* args);
@@ -3175,6 +3176,12 @@ static PyMethodDef functions[] = {
     {"jpeg_encoder", (PyCFunction)PyImaging_JpegEncoderNew, 1},
 #endif
     {"tiff_lzw_decoder", (PyCFunction)PyImaging_TiffLzwDecoderNew, 1},
+#ifdef HAVE_LIBTIFF
+    {"tiff_ccitt_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
+    {"group3_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
+    {"group4_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
+    {"tiff_raw_16_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
+#endif
     {"msp_decoder", (PyCFunction)PyImaging_MspDecoderNew, 1},
     {"packbits_decoder", (PyCFunction)PyImaging_PackbitsDecoderNew, 1},
     {"pcd_decoder", (PyCFunction)PyImaging_PcdDecoderNew, 1},

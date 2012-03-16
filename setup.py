@@ -36,7 +36,7 @@ def libinclude(root):
 TCL_ROOT = None
 JPEG_ROOT = None
 ZLIB_ROOT = None
-TIFF_ROOT = None
+TIFF_ROOT = "../tiff-4.0.1/libtiff"
 FREETYPE_ROOT = None
 LCMS_ROOT = None
 
@@ -69,7 +69,7 @@ LIBIMAGING = [
     "QuantHeap", "PcdDecode", "PcxDecode", "PcxEncode", "Point",
     "RankFilter", "RawDecode", "RawEncode", "Storage", "SunRleDecode",
     "TgaRleDecode", "Unpack", "UnpackYCC", "UnsharpMask", "XbmDecode",
-    "XbmEncode", "ZipDecode", "ZipEncode"
+    "XbmEncode", "ZipDecode", "ZipEncode", "TiffDecode"
     ]
 
 # --------------------------------------------------------------------
@@ -158,6 +158,7 @@ class pil_build_ext(build_ext):
         #
         # locate tkinter libraries
 
+        
         if _tkinter:
             TCL_VERSION = _tkinter.TCL_VERSION[:3]
 
@@ -185,6 +186,7 @@ class pil_build_ext(build_ext):
                     break
             else:
                 TCL_ROOT = None
+            
 
         #
         # add configured kits
@@ -242,6 +244,10 @@ class pil_build_ext(build_ext):
 
         if find_library_file(self, "tiff"):
             feature.tiff = "tiff"
+        if sys.platform == "win32" and find_library_file(self, "libtiff"):
+            feature.tiff = "libtiff"
+        if sys.platform == "darwin" and find_library_file(self, "libtiff"):
+            feature.tiff = "libtiff"
 
         if find_library_file(self, "freetype"):
             # look for freetype2 include files
@@ -297,14 +303,16 @@ class pil_build_ext(build_ext):
         if feature.zlib:
             libs.append(feature.zlib)
             defs.append(("HAVE_LIBZ", None))
+        if feature.tiff:
+            libs.append(feature.tiff)
+            defs.append(("HAVE_LIBTIFF", None))
         if sys.platform == "win32":
             libs.extend(["kernel32", "user32", "gdi32"])
         if struct.unpack("h", "\0\1")[0] == 1:
             defs.append(("WORDS_BIGENDIAN", None))
 
         exts = [(Extension(
-            "_imaging", files, libraries=libs, define_macros=defs
-            ))]
+            "_imaging", files, libraries=libs, define_macros=defs))]
 
         #
         # additional libraries
@@ -393,7 +401,7 @@ class pil_build_ext(build_ext):
             (feature.tcl and feature.tk, "TKINTER"),
             (feature.jpeg, "JPEG"),
             (feature.zlib, "ZLIB (PNG/ZIP)"),
-            # (feature.tiff, "experimental TIFF G3/G4 read"),
+            (feature.tiff, "experimental TIFF G3/G4 read"),
             (feature.freetype, "FREETYPE2"),
             (feature.lcms, "LITTLECMS"),
             ]

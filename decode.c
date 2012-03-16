@@ -52,6 +52,7 @@ typedef struct {
     PyObject_HEAD
     int (*decode)(Imaging im, ImagingCodecState state,
 		  UINT8* buffer, int bytes);
+    void (*cleanup)(ImagingCodecState state);
     struct ImagingCodecStateInstance state;
     Imaging im;
     PyObject* lock;
@@ -87,6 +88,7 @@ PyImaging_DecoderNew(int contextsize)
 
     /* Initialize decoder context */
     decoder->state.context = context;
+    decoder->cleanup = NULL;
 
     /* Target image */
     decoder->lock = NULL;
@@ -98,6 +100,8 @@ PyImaging_DecoderNew(int contextsize)
 static void
 _dealloc(ImagingDecoderObject* decoder)
 {
+    if (decoder->cleanup)
+    	decoder->cleanup(&decoder->state);
     free(decoder->state.buffer);
     free(decoder->state.context);
     Py_XDECREF(decoder->lock);
@@ -379,6 +383,80 @@ PyImaging_TiffLzwDecoderNew(PyObject* self, PyObject* args)
     return (PyObject*) decoder;
 }
 
+/* -------------------------------------------------------------------- */
+/* LibTiff								*/
+/* -------------------------------------------------------------------- */
+
+#ifdef HAVE_LIBTIFF
+
+#include "Tiff.h"
+
+#include <string.h>
+#ifdef __WIN32__
+#define strcasecmp(s1, s2) stricmp(s1, s2)
+#endif
+
+PyObject*
+PyImaging_LibTiffDecoderNew(PyObject* self, PyObject* args)
+{
+    ImagingDecoderObject* decoder;
+    char* mode;
+    char* rawmode;
+    char* compname;
+    int compression;
+    int fillorder = -1;
+    int count = -1;
+
+    if (! PyArg_ParseTuple(args, "sss|ii", &mode, &rawmode, &compname, &fillorder, &count))
+	return NULL;
+
+    TRACE(("new decoder %s, fillorder %d, %d bytes\n", compname, fillorder, count));
+
+    if (strcasecmp(compname, "tiff_ccitt") == 0) {
+	compression = COMPRESSION_CCITTRLE;
+
+    } else if (strcasecmp(compname, "group3") == 0) {
+	compression = COMPRESSION_CCITTFAX3;
+
+    } else if (strcasecmp(compname, "group4") == 0) {
+	compression = COMPRESSION_CCITTFAX4;
+
+    } else if (strcasecmp(compname, "tiff_raw_16") == 0) {
+	compression = COMPRESSION_CCITTRLEW;
+
+    } else {
+	PyErr_SetString(PyExc_ValueError, "unknown compession");
+	return NULL;
+    }
+
+    if (fillorder < 0) {
+	fillorder = FILLORDER_MSB2LSB;
+
+    } else if (fillorder != FILLORDER_MSB2LSB && fillorder != FILLORDER_LSB2MSB) {
+	PyErr_SetString(PyExc_ValueError, "invalid fillorder");
+	return NULL;
+    }
+
+    decoder = PyImaging_DecoderNew(sizeof(ClientState));
+    if (decoder == NULL)
+	return NULL;
+
+    if (get_unpacker(decoder, mode, rawmode) < 0)
+	return NULL;
+
+    if (! ImagingLibTiffInit(&decoder->state, compression, fillorder, count)) {
+	Py_DECREF(decoder);
+	PyErr_SetString(PyExc_RuntimeError, "tiff codec initialization failed");
+	return NULL;
+    }
+
+    decoder->decode  = ImagingLibTiffDecode;
+    decoder->cleanup = ImagingLibTiffCleanup;
+
+    return (PyObject*) decoder;
+}
+
+#endif
 
 /* -------------------------------------------------------------------- */
 /* MSP									*/

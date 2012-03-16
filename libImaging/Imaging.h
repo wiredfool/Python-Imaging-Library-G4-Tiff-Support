@@ -419,6 +419,10 @@ extern int ImagingJpegEncode(Imaging im, ImagingCodecState state,
 #endif
 extern int ImagingLzwDecode(Imaging im, ImagingCodecState state,
 			    UINT8* buffer, int bytes);
+#ifdef	HAVE_LIBTIFF
+extern int ImagingLibTiffDecode(Imaging im, ImagingCodecState state,
+				UINT8* buffer, int bytes);
+#endif
 #ifdef	HAVE_LIBMPEG
 extern int ImagingMpegDecode(Imaging im, ImagingCodecState state,
 			     UINT8* buffer, int bytes);
