@@ -18,7 +18,7 @@ typedef struct {
 } ClientState;
 
 
-extern int  ImagingLibTiffInit(ImagingCodecState state, int compression, int fillorder, int count);
+extern int  ImagingLibTiffInit(ImagingCodecState state, int compression);
 extern void ImagingLibTiffCleanup(ImagingCodecState state);
 
 

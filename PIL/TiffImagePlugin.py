@@ -563,7 +563,7 @@ class TiffImageFile(ImageFile.ImageFile):
 
         return self.__frame
 
-    def _decoder(self, rawmode, layer, tile=None, offset=0):
+    def _decoder(self, rawmode, layer, tile=None):
         "Setup decoder contexts"
 
         args = None
@@ -584,21 +584,6 @@ class TiffImageFile(ImageFile.ImageFile):
             if self.tag.has_key(317):
                 # Section 14: Differencing Predictor
                 self.decoderconfig = (self.tag[PREDICTOR][0],)
-        elif compression in ["tiff_ccitt", "group3", "group4", "tiff_raw_16"]:
-            if Image.DEBUG:
-                print "Activating g4 compression"
-                print "offset: %d" % offset
-            if offset:
-                curpos = self.fp.tell()
-                self.fp.seek(0)
-                self.tile_prefix = self.fp.read(offset)
-                self.fp.seek(curpos)
-            args = (rawmode,
-                    compression,
-                    (self.tag.has_key(FILLORDER)) \
-                    and self.tag[FILLORDER][0] or -1,
-                    (tile is not None and self.tag.has_key(STRIPBYTECOUNTS)) \
-                    and self.tag[STRIPBYTECOUNTS][tile] or -1)
                 
         if self.tag.has_key(ICCPROFILE):
             self.info['icc_profile'] = self.tag[ICCPROFILE]
@@ -683,17 +668,45 @@ class TiffImageFile(ImageFile.ImageFile):
             offsets = self.tag[STRIPOFFSETS]
             h = getscalar(ROWSPERSTRIP, ysize)
             w = self.size[0]
-            for i in range(len(offsets)):
-                a = self._decoder(rawmode, l, i, offsets[i])
+            if self._compression in ["tiff_ccitt", "group3",
+                                     "group4", "tiff_raw_16"]:
+                # Decoder expects entire file as one tile. so short
+                # circuit so we don't have do to nasty things to the
+                # prefix by reseeking to the head of the file and
+                # reading in to the offset (initial hack), which will
+                # then break if there's more than one strip anyway,
+                # since we wouldn't get the end of the file. So,
+                # Offset in the tile tuple is 0, we go from 0,0 to
+                # w,h, and we only do this once -- eds
+
+                # undone, if filesize > MAXBLOCK, this is going to fail.
+                if Image.DEBUG:
+                    print "Activating g4 compression for whole file"
+                    print "Offsets: %s" % offsets
+                    print "ByteCounts: %s "% self.tag[STRIPBYTECOUNTS]
+                    
+                ## if offsets[-1] + self.tag[STRIPBYTECOUNTS][-1] > self.decodermaxblock:
+                ##     print "image too large for decoder block max: %d" %(offsets[-1] + self.tag[STRIPBYTECOUNTS][-1])
+                ##     raise IOError("Image size > maxblock");
+                
+                a = (rawmode, self._compression)
                 self.tile.append(
                     (self._compression,
-                    (0, min(y, ysize), w, min(y+h, ysize)),
-                    offsets[i], a))
-                print "tiles: %s" % self.tile
-                y = y + h
-                if y >= self.size[1]:
-                    x = y = 0
-                    l = l + 1
+                     (0, 0, w, ysize),
+                     0, a))
+                a = None
+            else:
+                for i in range(len(offsets)):
+                    a = self._decoder(rawmode, l, i)
+                    self.tile.append(
+                        (self._compression,
+                        (0, min(y, ysize), w, min(y+h, ysize)),
+                        offsets[i], a))
+                    print "tiles: %s" % self.tile
+                    y = y + h
+                    if y >= self.size[1]:
+                        x = y = 0
+                        l = l + 1
                     a = None
         elif self.tag.has_key(TILEOFFSETS):
             # tiled image
