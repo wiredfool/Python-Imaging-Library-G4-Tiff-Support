@@ -124,7 +124,6 @@ int ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 	char *filename = "tempfile.tif";
 	char *mode = "r";
 	TIFF *tiff;
-	uint32 width, height;
 	int size;
 
 	/* buffer is the encoded file, bytes is the length of the encoded file */
@@ -179,14 +178,14 @@ int ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 	
 	// This thing pretty much requires that I have the whole image in one shot.
 	// Prehaps a stub version would work better???
-	while(state->y < height){
+	while(state->y < state->ysize){
 		if (TIFFReadScanline(tiff, (tdata_t)state->buffer, (uint32)state->y, 0) == -1) {
 			TRACE(("Decode Error, row %d\n", state->y));
 			state->errcode = IMAGING_CODEC_BROKEN;
 			TIFFClose(tiff);
 			return -1;
 		}
-		//TRACE(("Decoded row %d \n", state->y));
+		TRACE(("Decoded row %d \n", state->y));
 		state->shuffle((UINT8*) im->image[state->y + state->yoff] +
 					       state->xoff * im->pixelsize, 
 					   state->buffer,
