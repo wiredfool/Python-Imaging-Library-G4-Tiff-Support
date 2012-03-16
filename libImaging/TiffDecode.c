@@ -185,7 +185,7 @@ int ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 			TIFFClose(tiff);
 			return -1;
 		}
-		TRACE(("Decoded row %d \n", state->y));
+		/* TRACE(("Decoded row %d \n", state->y)); */
 		state->shuffle((UINT8*) im->image[state->y + state->yoff] +
 					       state->xoff * im->pixelsize, 
 					   state->buffer,
