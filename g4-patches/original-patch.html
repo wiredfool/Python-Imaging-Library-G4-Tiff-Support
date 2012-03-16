@@ -1,0 +1,584 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Image-SIG] PATCH: Group 4 TIFF compression support
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:image-sig%40python.org?Subject=%5BImage-SIG%5D%20PATCH%3A%20Group%204%20TIFF%20compression%20support&In-Reply-To=">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="002355.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Image-SIG] PATCH: Group 4 TIFF compression support</H1>
+    <B>Vladimir Pastukhov</B> 
+    <A HREF="mailto:image-sig%40python.org?Subject=%5BImage-SIG%5D%20PATCH%3A%20Group%204%20TIFF%20compression%20support&In-Reply-To="
+       TITLE="[Image-SIG] PATCH: Group 4 TIFF compression support">vpastukhov at naumen.ru
+       </A><BR>
+    <I>Tue Jul 29 22:32:07 EDT 2003</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="002355.html">[Image-SIG] PATCH: Group 4 TIFF compression support
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#2354">[ date ]</a>
+              <a href="thread.html#2354">[ thread ]</a>
+              <a href="subject.html#2354">[ subject ]</a>
+              <a href="author.html#2354">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+Enclosed patch for PIL 1.1.4 enables reading files encoded with
+group3, group4, tiff_ccitt and tiff_raw_16 TIFF compression schemes.
+Internally it uses libtiff (www.libtiff.org) for decompression.
+
+The following additional steps are required to build PIL with
+libtiff:
+
+1. Install libtiff library version 3.5.7.
+
+2. For PIL compilation you will need a full set of libtiff
+    include files, whereas only a subset of them gets installed.
+    Get the libtiff source and run configure to prepare headers
+    in libtiff subdirectory.
+
+3. Adjust paths to libtiff header files and library in setup.py
+    and libImaging/Makefile.
+
+4. Define HAVE_LIBTIFF in libImaging/ImConfig.h
+
+The code has been tested so far only with a limited set of
+group4-encoded images.  Feedback and bug reports are welcome.
+
+Best regards,
+-- 
+Vladimir Pastukhov &lt;<A HREF="http://mail.python.org/mailman/listinfo/image-sig">vpastukhov at naumen.ru</A>&gt;
+
+-------------- next part --------------
+--- ./PIL/TiffImagePlugin.py.orig	Wed May  7 02:44:17 2003
++++ ./PIL/TiffImagePlugin.py	Tue Jul 29 18:35:36 2003
+@@ -65,6 +65,7 @@
+ BITSPERSAMPLE = 258
+ COMPRESSION = 259
+ PHOTOMETRIC_INTERPRETATION = 262
++FILLORDER = 266
+ IMAGEDESCRIPTION = 270
+ STRIPOFFSETS = 273
+ SAMPLESPERPIXEL = 277
+@@ -451,7 +452,7 @@
+ 
+         return self.__frame
+ 
+-    def _decoder(self, rawmode, layer):
++    def _decoder(self, rawmode, layer, tile=None):
+         &quot;Setup decoder contexts&quot;
+ 
+         args = None
+@@ -459,6 +460,13 @@
+             rawmode = rawmode[layer]
+         if self._compression == &quot;raw&quot;:
+             args = (rawmode, 0, 1)
++        if self._compression in [&quot;tiff_ccitt&quot;, &quot;group3&quot;, &quot;group4&quot;, &quot;tiff_raw_16&quot;]:
++            args = (rawmode,
++                    self._compression,
++                    (self.tag.has_key(FILLORDER)) \
++                        and self.tag[FILLORDER][0] or -1,
++                    (tile is not None and self.tag.has_key(STRIPBYTECOUNTS)) \
++                        and self.tag[STRIPBYTECOUNTS][tile] or -1)
+         if self._compression in [&quot;packbits&quot;, &quot;tiff_lzw&quot;, &quot;jpeg&quot;]:
+             args = rawmode
+             if self._compression == &quot;jpeg&quot; and self.tag.has_key(JPEGTABLES):
+@@ -525,16 +533,15 @@
+         self.tile = []
+         if self.tag.has_key(STRIPOFFSETS):
+             # striped image
++            offsets = self.tag[STRIPOFFSETS]
+             h = getscalar(ROWSPERSTRIP, ysize)
+             w = self.size[0]
+-            a = None
+-            for o in self.tag[STRIPOFFSETS]:
+-                if not a:
+-                    a = self._decoder(rawmode, l)
++            for i in range(len(offsets)):
++                a = self._decoder(rawmode, l, i)
+                 self.tile.append(
+                     (self._compression,
+                     (0, min(y, ysize), w, min(y+h, ysize)),
+-                    o, a))
++                    offsets[i], a))
+                 y = y + h
+                 if y &gt;= self.size[1]:
+                     x = y = 0
+--- ./Setup.in.orig	Tue Apr 22 22:11:25 2003
++++ ./Setup.in	Fri Jul 25 16:18:52 2003
+@@ -32,6 +32,9 @@
+ # *** IJG JPEG library (libjpeg) location
+ 	-I/usr/local/include -L/usr/local/lib -ljpeg \
+ #
++# *** TIFF library (libtiff) location
++	-I../../kits/tifflib -ltiff \
++#
+ # *** ZLIB (libz) location
+ 	-I/usr/local/include -L/usr/local/lib -lz
+ 
+--- ./_imaging.c.orig	Sat Apr 26 17:50:24 2003
++++ ./_imaging.c	Fri Jul 25 17:48:02 2003
+@@ -2658,6 +2658,7 @@
+ extern PyObject* PyImaging_HexDecoderNew(PyObject* self, PyObject* args);
+ extern PyObject* PyImaging_JpegDecoderNew(PyObject* self, PyObject* args);
+ extern PyObject* PyImaging_TiffLzwDecoderNew(PyObject* self, PyObject* args);
++extern PyObject* PyImaging_LibTiffDecoderNew(PyObject* self, PyObject* args);
+ extern PyObject* PyImaging_MspDecoderNew(PyObject* self, PyObject* args);
+ extern PyObject* PyImaging_PackbitsDecoderNew(PyObject* self, PyObject* args);
+ extern PyObject* PyImaging_PcdDecoderNew(PyObject* self, PyObject* args);
+@@ -2719,6 +2720,12 @@
+     {&quot;jpeg_encoder&quot;, (PyCFunction)PyImaging_JpegEncoderNew, 1},
+ #endif
+     {&quot;tiff_lzw_decoder&quot;, (PyCFunction)PyImaging_TiffLzwDecoderNew, 1},
++#ifdef HAVE_LIBTIFF
++    {&quot;tiff_ccitt_decoder&quot;, (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
++    {&quot;group3_decoder&quot;, (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
++    {&quot;group4_decoder&quot;, (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
++    {&quot;tiff_raw_16_decoder&quot;, (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
++#endif
+     {&quot;msp_decoder&quot;, (PyCFunction)PyImaging_MspDecoderNew, 1},
+     {&quot;packbits_decoder&quot;, (PyCFunction)PyImaging_PackbitsDecoderNew, 1},
+     {&quot;pcd_decoder&quot;, (PyCFunction)PyImaging_PcdDecoderNew, 1},
+--- ./decode.c.orig	Tue Apr 22 22:11:26 2003
++++ ./decode.c	Tue Jul 29 19:59:17 2003
+@@ -52,6 +52,7 @@
+     PyObject_HEAD
+     int (*decode)(Imaging im, ImagingCodecState state,
+ 		  UINT8* buffer, int bytes);
++    void (*cleanup)(ImagingCodecState state);
+     struct ImagingCodecStateInstance state;
+     Imaging im;
+     PyObject* lock;
+@@ -87,6 +88,7 @@
+ 
+     /* Initialize decoder context */
+     decoder-&gt;state.context = context;
++    decoder-&gt;cleanup = NULL;
+ 
+     /* Target image */
+     decoder-&gt;lock = NULL;
+@@ -98,6 +100,8 @@
+ static void
+ _dealloc(ImagingDecoderObject* decoder)
+ {
++    if (decoder-&gt;cleanup)
++    	decoder-&gt;cleanup(&amp;decoder-&gt;state);
+     free(decoder-&gt;state.buffer);
+     free(decoder-&gt;state.context);
+     Py_XDECREF(decoder-&gt;lock);
+@@ -381,6 +385,80 @@
+     return (PyObject*) decoder;
+ }
+ 
++/* -------------------------------------------------------------------- */
++/* LibTiff								*/
++/* -------------------------------------------------------------------- */
++
++#ifdef HAVE_LIBTIFF
++
++#include &quot;Tiff.h&quot;
++
++#include &lt;string.h&gt;
++#ifdef __WIN32__
++#define strcasecmp(s1, s2) stricmp(s1, s2)
++#endif
++
++PyObject*
++PyImaging_LibTiffDecoderNew(PyObject* self, PyObject* args)
++{
++    ImagingDecoderObject* decoder;
++    char* mode;
++    char* rawmode;
++    char* compname;
++    int compression;
++    int fillorder = -1;
++    int count = -1;
++
++    if (! PyArg_ParseTuple(args, &quot;sss|ii&quot;, &amp;mode, &amp;rawmode, &amp;compname, &amp;fillorder, &amp;count))
++	return NULL;
++
++    TRACE((&quot;new decoder %s, fillorder %d, %d bytes\n&quot;, compname, fillorder, count));
++
++    if (strcasecmp(compname, &quot;tiff_ccitt&quot;) == 0) {
++	compression = COMPRESSION_CCITTRLE;
++
++    } else if (strcasecmp(compname, &quot;group3&quot;) == 0) {
++	compression = COMPRESSION_CCITTFAX3;
++
++    } else if (strcasecmp(compname, &quot;group4&quot;) == 0) {
++	compression = COMPRESSION_CCITTFAX4;
++
++    } else if (strcasecmp(compname, &quot;tiff_raw_16&quot;) == 0) {
++	compression = COMPRESSION_CCITTRLEW;
++
++    } else {
++	PyErr_SetString(PyExc_ValueError, &quot;unknown compession&quot;);
++	return NULL;
++    }
++
++    if (fillorder &lt; 0) {
++	fillorder = FILLORDER_MSB2LSB;
++
++    } else if (fillorder != FILLORDER_MSB2LSB &amp;&amp; fillorder != FILLORDER_LSB2MSB) {
++	PyErr_SetString(PyExc_ValueError, &quot;invalid fillorder&quot;);
++	return NULL;
++    }
++
++    decoder = PyImaging_DecoderNew(sizeof(TIFFSTATE));
++    if (decoder == NULL)
++	return NULL;
++
++    if (get_unpacker(decoder, mode, rawmode) &lt; 0)
++	return NULL;
++
++    if (! ImagingLibTiffInit(&amp;decoder-&gt;state, compression, fillorder, count)) {
++	Py_DECREF(decoder);
++	PyErr_SetString(PyExc_RuntimeError, &quot;tiff codec initialization failed&quot;);
++	return NULL;
++    }
++
++    decoder-&gt;decode  = ImagingLibTiffDecode;
++    decoder-&gt;cleanup = ImagingLibTiffCleanup;
++
++    return (PyObject*) decoder;
++}
++
++#endif
+ 
+ /* -------------------------------------------------------------------- */
+ /* MSP									*/
+--- ./libImaging/ImConfig.h.in.orig	Tue Apr 22 22:11:26 2003
++++ ./libImaging/ImConfig.h.in	Fri Jul 25 15:12:29 2003
+@@ -45,6 +45,9 @@
+ /* Define if you have the IJG jpeg library (-ljpeg).  */
+ #undef HAVE_LIBJPEG
+ 
++/* Define if you have the tiff library (-ltiff).  */
++#undef HAVE_LIBTIFF
++
+ /* Define if you have the Greg Ward's mpeg library (-lmpeg).  */
+ #undef HAVE_LIBMPEG
+ 
+--- ./libImaging/ImConfig.h.win.orig	Tue Apr 22 22:11:26 2003
++++ ./libImaging/ImConfig.h.win	Fri Jul 25 15:13:38 2003
+@@ -13,6 +13,9 @@
+ /* Define if you have the IJG jpeg library (-ljpeg).  */
+ #define HAVE_LIBJPEG
+ 
++/* Define if you have the tiff library (-ltiff).  */
++#define HAVE_LIBTIFF
++
+ /* Define if you have the Greg Ward's mpeg library (-lmpeg).  */
+ #undef HAVE_LIBMPEG
+ 
+--- ./libImaging/Imaging.h.orig	Tue Apr 22 22:56:24 2003
++++ ./libImaging/Imaging.h	Fri Jul 25 15:29:59 2003
+@@ -389,6 +389,10 @@
+ #endif
+ extern int ImagingLzwDecode(Imaging im, ImagingCodecState state,
+ 			    UINT8* buffer, int bytes);
++#ifdef	HAVE_LIBTIFF
++extern int ImagingLibTiffDecode(Imaging im, ImagingCodecState state,
++				UINT8* buffer, int bytes);
++#endif
+ #ifdef	HAVE_LIBMPEG
+ extern int ImagingMpegDecode(Imaging im, ImagingCodecState state,
+ 			     UINT8* buffer, int bytes);
+--- ./libImaging/Makefile.in.orig	Tue Apr 22 22:11:26 2003
++++ ./libImaging/Makefile.in	Fri Jul 25 16:18:22 2003
+@@ -31,9 +31,10 @@
+ 
+ INCLDIR=	$(srcdir)/.
+ JPEGINCLUDE=	/usr/local/include
++TIFFINCLUDE=	../../../kits/tifflib
+ OPT=		@OPT@
+ #OPT=		-g
+-CFLAGS=		$(OPT) -I$(INCLDIR) -I$(JPEGINCLUDE) $(DEFS)
++CFLAGS=		$(OPT) -I$(INCLDIR) -I$(JPEGINCLUDE) -I$(TIFFINCLUDE) $(DEFS)
+ 
+ MKDEP=		mkdep
+ SHELL=		/bin/sh
+@@ -71,6 +72,7 @@
+ 		RawDecode.o RawEncode.o \
+ 		SunRleDecode.o \
+ 		TgaRleDecode.o \
++		TiffDecode.o \
+ 		XbmDecode.o XbmEncode.o \
+ 		ZipDecode.o ZipEncode.o
+ 
+--- ./libImaging/Makefile.win.orig	Tue Apr 22 22:11:26 2003
++++ ./libImaging/Makefile.win	Thu Jul 24 22:19:22 2003
+@@ -76,6 +76,7 @@
+ 		Storage.obj\
+ 		SunRleDecode.obj\
+ 		TgaRleDecode.obj\
++		TiffDecode.obj\
+ 		Unpack.obj\
+ 		UnpackYCC.obj\
+ 		XbmDecode.obj\
+--- ./libImaging/Tiff.h.orig	Fri Jul 25 15:30:53 2003
++++ ./libImaging/Tiff.h	Tue Jul 29 19:06:40 2003
+@@ -0,0 +1,27 @@
++/*
++ * The Python Imaging Library.
++ * $Id: //modules/pil/libImaging/Tiff.h#1 $
++ *
++ * declarations for the LibTiff-based Group3 and Group4 decoder
++ *
++ */
++
++#include &lt;tiffiop.h&gt;
++
++typedef struct {
++
++    /* PRIVATE CONTEXT (set by decoder) */
++    TIFF tiff;
++    int count;
++
++} TIFFSTATE;
++
++extern int  ImagingLibTiffInit(ImagingCodecState state, int compression, int fillorder, int count);
++extern void ImagingLibTiffCleanup(ImagingCodecState state);
++
++/*
++#define VA_ARGS(...)	__VA_ARGS__
++#define TRACE(args)    fprintf(stderr, VA_ARGS args)
++*/
++
++#define TRACE(args)
+--- ./libImaging/TiffDecode.c.orig	Fri Jul 25 15:30:58 2003
++++ ./libImaging/TiffDecode.c	Tue Jul 29 19:06:48 2003
+@@ -0,0 +1,185 @@
++/*
++ * The Python Imaging Library.
++ * $Id: //modules/pil/libImaging/TiffDecode.c#1 $
++ *
++ * LibTiff-based Group3 and Group4 decoder
++ *
++ */
++
++#include &quot;Imaging.h&quot;
++
++#ifdef HAVE_LIBTIFF
++
++#undef INT32
++#undef UINT32
++
++#include &quot;Tiff.h&quot;
++
++#include &lt;stddef.h&gt;
++
++#include &lt;tiffio.h&gt;
++#include &lt;tiffiop.h&gt;
++
++extern void _TIFFSetDefaultCompressionState(TIFF* tif);
++
++typedef	void (*TIFFFaxFillFunc)(unsigned char*, uint32*, uint32*, uint32);
++
++typedef struct {
++	int     rw_mode;                /* O_RDONLY for decode, else encode */
++	int	mode;			/* operating mode */
++	uint32	rowbytes;		/* bytes in a decoded scanline */
++	uint32	rowpixels;		/* pixels in a scanline */
++
++	uint16	cleanfaxdata;		/* CleanFaxData tag */
++	uint32	badfaxrun;		/* BadFaxRun tag */
++	uint32	badfaxlines;		/* BadFaxLines tag */
++	uint32	groupoptions;		/* Group 3/4 options tag */
++	uint32	recvparams;		/* encoded Class 2 session params */
++	char*	subaddress;		/* subaddress string */
++	uint32	recvtime;		/* time spent receiving (secs) */
++	TIFFVGetMethod vgetparent;	/* super-class method */
++	TIFFVSetMethod vsetparent;	/* super-class method */
++} Fax3BaseState;
++
++typedef struct {
++	Fax3BaseState b;
++	const u_char* bitmap;		/* bit reversal table */
++	uint32	data;			/* current i/o byte/word */
++	int	bit;			/* current i/o bit in byte */
++	int	EOLcnt;			/* count of EOL codes recognized */
++	TIFFFaxFillFunc fill;		/* fill routine */
++	uint32*	runs;			/* b&amp;w runs for current/previous row */
++	uint32*	refruns;		/* runs for reference line */
++	uint32*	curruns;		/* runs for current line */
++} Fax3DecodeState;
++
++
++#define DECODER_STATE(tiff) (UINT8 *)(tiff-&gt;tif_data + offsetof(Fax3DecodeState, bitmap))
++#define DECODER_STATE_SIZE  (sizeof(Fax3DecodeState) - offsetof(Fax3DecodeState, bitmap))
++
++
++static void
++_errorHandler(const char* module, const char* fmt, va_list ap)
++{
++    /* be quiet */
++}
++
++static void
++_cleanupLibTiff( TIFF *tiff )
++{
++    if (tiff-&gt;tif_cleanup)
++	tiff-&gt;tif_cleanup(tiff);
++
++    if (tiff-&gt;tif_fieldinfo)
++	free(tiff-&gt;tif_fieldinfo);
++}
++
++int
++ImagingLibTiffInit(ImagingCodecState state, int compression, int fillorder, int count)
++{
++    TIFF *tiff = &amp;((TIFFSTATE *) state-&gt;context)-&gt;tiff;
++    const TIFFCodec *codec;
++
++    TIFFSetErrorHandler(_errorHandler);
++    TIFFSetWarningHandler(_errorHandler);
++
++    codec = TIFFFindCODEC((uint16) compression);
++    if (codec == NULL)
++	return 0;
++
++    _TIFFmemset(tiff, 0, sizeof (*tiff));
++    _TIFFSetDefaultCompressionState(tiff);
++    TIFFDefaultDirectory(tiff);
++
++    tiff-&gt;tif_mode = O_RDONLY;
++    tiff-&gt;tif_dir.td_fillorder = (uint16) fillorder;
++    tiff-&gt;tif_dir.td_compression = (uint16) compression;
++
++    ((TIFFSTATE *) state-&gt;context)-&gt;count = count;
++
++    if (! codec-&gt;init(tiff, 0)) {
++	_cleanupLibTiff(tiff);
++	return 0;
++    }
++
++    return 1;
++}
++
++void
++ImagingLibTiffCleanup(ImagingCodecState state)
++{
++    _cleanupLibTiff( &amp;((TIFFSTATE *) state-&gt;context)-&gt;tiff );
++}
++
++int
++ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int bytes)
++{
++    TIFF *tiff = &amp;((TIFFSTATE *) state-&gt;context)-&gt;tiff;
++    int count  = ((TIFFSTATE *) state-&gt;context)-&gt;count;
++    int savecc;
++    UINT8 saveds[DECODER_STATE_SIZE];
++
++    if (bytes &lt; count)
++	return 0;
++
++    if ((tiff-&gt;tif_flags &amp; TIFF_CODERSETUP) == 0) {
++	tiff-&gt;tif_dir.td_bitspersample = 1;
++	tiff-&gt;tif_dir.td_imagewidth = state-&gt;xsize;
++	tiff-&gt;tif_scanlinesize = TIFFScanlineSize(tiff);
++
++	if (! tiff-&gt;tif_setupdecode(tiff) || ! tiff-&gt;tif_predecode(tiff, 0)) {
++	    state-&gt;errcode = IMAGING_CODEC_BROKEN;
++	    return -1;
++	}
++
++	tiff-&gt;tif_flags |= TIFF_CODERSETUP;
++    }
++
++    tiff-&gt;tif_row   = state-&gt;y + state-&gt;yoff;
++    tiff-&gt;tif_rawcp = buffer;
++    tiff-&gt;tif_rawcc = bytes;
++
++    TRACE((&quot;decoding %d bytes, row %d\n&quot;, bytes, tiff-&gt;tif_row));
++    for (;;) {
++	if (count &lt; 0) {
++	    savecc = tiff-&gt;tif_rawcc;
++	    memcpy(saveds, DECODER_STATE(tiff), DECODER_STATE_SIZE);
++	}
++
++	if (tiff-&gt;tif_decoderow(tiff, (tidata_t) state-&gt;buffer,
++				tiff-&gt;tif_scanlinesize, 0) &lt; 0) {
++	    TRACE((&quot;decode error, %d bytes left\n&quot;, tiff-&gt;tif_rawcc));
++	    if (count &lt; 0)
++		break;
++	    state-&gt;errcode = IMAGING_CODEC_BROKEN;
++	    return -1;
++	}
++
++	if (count &lt; 0 &amp;&amp; tiff-&gt;tif_rawcc &lt;= 0) {
++	    TRACE((&quot;not enough data\n&quot;));
++	    break;
++	}
++
++	tiff-&gt;tif_postdecode(tiff, (tidata_t) buffer, tiff-&gt;tif_scanlinesize);
++
++	state-&gt;shuffle((UINT8*) im-&gt;image[state-&gt;y + state-&gt;yoff] +
++		       state-&gt;xoff * im-&gt;pixelsize, state-&gt;buffer,
++		       state-&gt;xsize);
++
++	TRACE((&quot;decoded row %d, %d bytes left\n&quot;, tiff-&gt;tif_row, tiff-&gt;tif_rawcc));
++	tiff-&gt;tif_row++;
++	state-&gt;y++;
++
++	if (state-&gt;y &gt;= state-&gt;ysize) {
++	    TRACE((&quot;decoded %d rows\n&quot;, state-&gt;y));
++	    return -1; /* errcode = 0 */
++	}
++    }
++
++    memcpy(DECODER_STATE(tiff), saveds, DECODER_STATE_SIZE);
++
++    TRACE((&quot;decoded %d rows, %d bytes left\n&quot;, state-&gt;y, savecc));
++    return bytes - savecc;
++}
++
++#endif
+--- ./setup.py.orig	Fri May  9 18:00:56 2003
++++ ./setup.py	Fri Jul 25 16:18:34 2003
+@@ -24,6 +24,7 @@
+ # on windows, the build script expects to find both library files and
+ # include files in the directories below.  tweak as necessary.
+ JPEGDIR = &quot;../../kits/jpeg-6b&quot;
++TIFFDIR = &quot;../../kits/tifflib&quot;
+ ZLIBDIR = &quot;../../kits/zlib-1.1.4&quot;
+ FREETYPEDIR = &quot;../../kits/freetype-2.0&quot;
+ 
+@@ -72,6 +73,8 @@
+         elif lib == &quot;TIFF&quot;:
+             HAVE_LIBTIFF = 1
+             LIBRARIES.append(&quot;tiff&quot;)
++            INCLUDE_DIRS.append(TIFFDIR)
++            LIBRARY_DIRS.append(TIFFDIR)
+         elif lib == &quot;Z&quot;:
+             HAVE_LIBZ = 1
+             if sys.platform == &quot;win32&quot;:
+</PRE>
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="002355.html">[Image-SIG] PATCH: Group 4 TIFF compression support
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#2354">[ date ]</a>
+              <a href="thread.html#2354">[ thread ]</a>
+              <a href="subject.html#2354">[ subject ]</a>
+              <a href="author.html#2354">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://mail.python.org/mailman/listinfo/image-sig">More information about the Image-SIG
+mailing list</a><br>
+</body></html>

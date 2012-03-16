@@ -1,0 +1,33 @@
+Notes on the G4 patch for PIL
+
+Eric Soroos -- eric@soroos.net -- 3/16/2012
+
+The original patch was on the Image-SIG list in July 2003, included
+here as original-patch.html. I have maintained this patch and compiled
+it against Windows through PIL 1.1.5 and 1.1.6.  I had a need to put
+it on ubuntu 10.04, against PIL 1.1.7 and could not get it to read an
+image without segfaulting. Following some research and code diving,
+the patch uses a ton of internal interfaces from libtiff, and would
+eventually break in exactly this manner.
+
+from http://mail.python.org/pipermail/image-sig/2009-May/005698.html
+
+On approximately 5/20/2009 5:34 AM, came the following characters from 
+the keyboard of Fredrik Lundh:
+> On Tue, May 19, 2009 at 9:52 PM, Greg Taylor <gtaylor at clemson.edu> wrote:
+>   
+>> Googling around, I keep seeing mention over the years that PIL has no Group4
+>> tiff decoder. I saw mention of a patch for PIL 1.1.4, but it doesn't look
+>> like this ever made it into upstream. Perhaps I haven't dug deep enough, but
+>> can anyone enlighten me to what the situation is currently with Group4 Tiff
+>> decoding? I'd love to be able to use PIL for some mission critical stuff at
+>> work, but this is a show-stopper due to our setup.
+>>     
+>
+> The patch depended on too many libtiff internals for me to feel
+> confident that it was a good idea to add it to PIL's standard
+> distribution; 
+
+The patches in this directory were my starting point to add G3/4
+support without relying on libtiff internal interfaces.
+
