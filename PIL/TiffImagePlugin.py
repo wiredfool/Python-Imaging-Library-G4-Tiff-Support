@@ -685,9 +685,9 @@ class TiffImageFile(ImageFile.ImageFile):
                     print "Offsets: %s" % offsets
                     print "ByteCounts: %s "% self.tag[STRIPBYTECOUNTS]
                     
-                ## if offsets[-1] + self.tag[STRIPBYTECOUNTS][-1] > self.decodermaxblock:
-                ##     print "image too large for decoder block max: %d" %(offsets[-1] + self.tag[STRIPBYTECOUNTS][-1])
-                ##     raise IOError("Image size > maxblock");
+                if offsets[-1] + self.tag[STRIPBYTECOUNTS][-1] > self.decodermaxblock:
+                     print "image too large for decoder block max: %d" %(offsets[-1] + self.tag[STRIPBYTECOUNTS][-1])
+                     raise IOError("Image size > maxblock");
                 
                 a = (rawmode, self._compression)
                 self.tile.append(
