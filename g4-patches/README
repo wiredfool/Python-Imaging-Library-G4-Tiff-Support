@@ -31,3 +31,20 @@ the keyboard of Fredrik Lundh:
 The patches in this directory were my starting point to add G3/4
 support without relying on libtiff internal interfaces.
 
+
+
+-----
+Other G4 options
+-----
+
+pylibtiff: http://code.google.com/p/pylibtiff/ 
+
+Returns images as numpy arrays, didn't want that dependency.  There's
+a note that it doesn't work with compressed files, my initial tests
+were not promising, so I'm not sure if that means not g4, or something
+else.
+
+pytiff: http://www.haynold.com/software_projects/2004/pytiff/
+
+I prefer Python license to GPL. Doesn't appear to work from an in memory
+buffer, only from a file.  
