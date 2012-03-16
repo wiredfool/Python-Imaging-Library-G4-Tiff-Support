@@ -13,9 +13,14 @@ This version includes patches to read Group4 Tiffs using libtiff. See
 Current Status:
     It can decode the imagemagick test images I've thrown at it. 
 	It builds on Ubuntu 10.04 against libtiff 4.0.1 & python 2.6 
+	It's in debug mode. 
+	It uses a horrible hack and probably only works on single stripe 
+	  images.
 TODO:
     Windows
 	More test images
+	Cleanup
+
 
 ====
 
