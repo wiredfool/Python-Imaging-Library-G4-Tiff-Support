@@ -10,17 +10,22 @@ PIL 1.1.7, The G4 Edition. (March 2012) Eric Soroos, eric@soroos.net
 This version includes patches to read Group4 Tiffs using libtiff. See
 ./g4-patches/README for some history.
 
-Current Status:
-    It can decode the imagemagick test images I've thrown at it. 
-	It builds on Ubuntu 10.04 against libtiff 4.0.1 & python 2.6 
-	It's in debug mode. 
-	It uses a horrible hack and probably only works on single stripe 
-	  images.
-TODO:
-    Windows
-	More test images
-	Cleanup
++ Current Status:
+  - It can decode the imagemagick test images I've thrown at it.
+  - Bits from those test images are the same as reading the equivalent tiff. 
+  - It builds on Ubuntu 10.04 against libtiff 4.0.1 & python 2.6
+  - Also works against the 10.04 libtiff4 package, which is actually 
+      3.9.6, but reports as 4.3.   
+  - It's in debug mode. 
+  - It uses a horrible hack and probably only works on single stripe 
+	  images. Definitely only works on images < 65k
 
++ TODO:
+  - Windows
+  - More test images
+  - Cleanup
+  - Writing
+  - If we've got a file or fd, let libtiff do the reading instead of us. 
 
 ====
 
