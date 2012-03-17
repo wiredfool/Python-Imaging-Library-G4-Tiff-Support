@@ -19,7 +19,6 @@ typedef struct {
 
 
 extern int  ImagingLibTiffInit(ImagingCodecState state, int compression);
-extern void ImagingLibTiffCleanup(ImagingCodecState state);
 
 
 #define VA_ARGS(...)	__VA_ARGS__

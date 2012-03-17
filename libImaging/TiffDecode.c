@@ -115,10 +115,6 @@ int ImagingLibTiffInit(ImagingCodecState state, int compression) {
     return 1;
 }
 
-void ImagingLibTiffCleanup(ImagingCodecState state) {
-    return;
-}
-
 int ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int bytes) {
 	ClientState *clientstate = (ClientState *)state->context;
 	char *filename = "tempfile.tif";

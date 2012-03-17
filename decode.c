@@ -52,7 +52,6 @@ typedef struct {
     PyObject_HEAD
     int (*decode)(Imaging im, ImagingCodecState state,
 		  UINT8* buffer, int bytes);
-    void (*cleanup)(ImagingCodecState state);
     struct ImagingCodecStateInstance state;
     Imaging im;
     PyObject* lock;
@@ -88,7 +87,6 @@ PyImaging_DecoderNew(int contextsize)
 
     /* Initialize decoder context */
     decoder->state.context = context;
-    decoder->cleanup = NULL;
 
     /* Target image */
     decoder->lock = NULL;
@@ -100,8 +98,6 @@ PyImaging_DecoderNew(int contextsize)
 static void
 _dealloc(ImagingDecoderObject* decoder)
 {
-    if (decoder->cleanup)
-    	decoder->cleanup(&decoder->state);
     free(decoder->state.buffer);
     free(decoder->state.context);
     Py_XDECREF(decoder->lock);
@@ -446,7 +442,6 @@ PyImaging_LibTiffDecoderNew(PyObject* self, PyObject* args)
     }
 
     decoder->decode  = ImagingLibTiffDecode;
-    decoder->cleanup = ImagingLibTiffCleanup;
 
     return (PyObject*) decoder;
 }
