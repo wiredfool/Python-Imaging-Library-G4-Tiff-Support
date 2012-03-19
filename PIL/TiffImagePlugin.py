@@ -44,7 +44,7 @@ __version__ = "1.3.5"
 import Image, ImageFile
 import ImagePalette
 
-import array, string, sys
+import array, string, sys, os
 
 II = "II" # little-endian (intel-style)
 MM = "MM" # big-endian (motorola-style)
@@ -590,6 +590,68 @@ class TiffImageFile(ImageFile.ImageFile):
 
         return args
 
+    def _load_libtiff(self):
+        """ Overload method triggered when we detect a g3/g4 tiff
+            Calls out to lib tiff """
+
+        pixel = Image.Image.load(self)
+
+        if self.tile is None:
+            raise IOError("cannot load this image")
+        if not self.tile:
+            return pixel
+
+        self.load_prepare()
+
+
+        
+        if not len(self.tile) == 1:
+            raise IOError("Not exactly one tile")
+
+
+        d, e, o, a = self.tile[0]
+        d = Image._getdecoder(self.mode, d, a, self.decoderconfig)
+        try:
+            d.setimage(self.im, e)
+        except ValueError:
+            raise IOError("Couldn't set the image")
+
+        if hasattr(self.fp, "fileno"):
+            # we've got a actual file on disk, pass in the fp.
+            if Image.DEBUG:
+                print "have fileno, calling fileno version of the decoder."
+            self.fp.seek(0)
+            n,e = d.decode("fpfp") # 4 bytes, otherwise the trace might error out
+        elif hasattr(self.fp, "getvalue"):
+            # We've got a stringio like thing passed in. Yay for all in memory.
+            # The decoder needs the entire file in one shot, so there's not
+            # a lot we can do here other than give it the entire file.
+            # unless we could do something like get the address of the underlying
+            # string for stringio.
+            if Image.DEBUG:
+                print "have getvalue. just sending in a string from getvalue"
+            n,e = d.decode(self.fp.getvalue())
+        else:
+            # we have something else.
+            if Image.DEBUG:
+                print "don't have fileno or getvalue. just reading"
+            # UNDONE -- so much for that buffer size thing. 
+            n, e = d.decode(self.fp.read())
+
+        
+        self.tile = []
+        self.readonly = 0
+        self.fp = None # might be shared
+
+        if e < 0:
+            raise_ioerror(e)
+
+        self.load_end()
+
+        return Image.Image.load(self)
+
+        
+            
     def _setup(self):
         "Setup this image object based on current tags"
 
@@ -670,31 +732,36 @@ class TiffImageFile(ImageFile.ImageFile):
             w = self.size[0]
             if self._compression in ["tiff_ccitt", "group3",
                                      "group4", "tiff_raw_16"]:
-                # Decoder expects entire file as one tile. so short
-                # circuit so we don't have do to nasty things to the
-                # prefix by reseeking to the head of the file and
-                # reading in to the offset (initial hack), which will
-                # then break if there's more than one strip anyway,
-                # since we wouldn't get the end of the file. So,
-                # Offset in the tile tuple is 0, we go from 0,0 to
-                # w,h, and we only do this once -- eds
-
-                # undone, if filesize > MAXBLOCK, this is going to fail.
                 if Image.DEBUG:
                     print "Activating g4 compression for whole file"
-                    print "Offsets: %s" % offsets
-                    print "ByteCounts: %s "% self.tag[STRIPBYTECOUNTS]
-                    
-                if offsets[-1] + self.tag[STRIPBYTECOUNTS][-1] > self.decodermaxblock:
-                     print "image too large for decoder block max: %d" %(offsets[-1] + self.tag[STRIPBYTECOUNTS][-1])
-                     raise IOError("Image size > maxblock");
+
+                # Decoder expects entire file as one tile.
+                # There's a buffer size limit in load (64k)
+                # so large g4 images will fail if we use that
+                # function. 
+                #
+                # Setup the one tile for the whole image, then
+                # replace the existing load function with our
+                # _load_libtiff function.
                 
-                a = (rawmode, self._compression)
+                self.load = self._load_libtiff
+                
+                # To be nice on memory footprint, if there's a
+                # file descriptor, use that instead of reading
+                # into a string in python.
+
+                # libtiff closes the file descriptor, so pass in a dup. 
+                fp = hasattr(self.fp, "fileno") and os.dup(self.fp.fileno())
+
+                # Offset in the tile tuple is 0, we go from 0,0 to
+                # w,h, and we only do this once -- eds
+                a = (rawmode, self._compression, fp )
                 self.tile.append(
                     (self._compression,
                      (0, 0, w, ysize),
                      0, a))
                 a = None
+
             else:
                 for i in range(len(offsets)):
                     a = self._decoder(rawmode, l, i)

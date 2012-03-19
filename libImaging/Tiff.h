@@ -15,10 +15,11 @@ typedef struct {
 	tdata_t data; /* tdata_t == void* */
 	toff_t loc;   /* toff_t == uint32 */
 	tsize_t size; /* tsize_t == int32 */
-} ClientState;
+	int fp;
+} TIFFSTATE;
 
 
-extern int  ImagingLibTiffInit(ImagingCodecState state, int compression);
+extern int  ImagingLibTiffInit(ImagingCodecState state, int compression, int fp);
 
 
 #define VA_ARGS(...)	__VA_ARGS__

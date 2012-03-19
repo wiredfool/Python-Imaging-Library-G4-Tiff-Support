@@ -20,7 +20,7 @@
 #include "Tiff.h"
 
 
-void dump_state(const ClientState *state){
+void dump_state(const TIFFSTATE *state){
 	TRACE(("State: Location %u, size %d, data: %p \n", (uint)state->loc, (int)state->size, state->data));
 }
 
@@ -29,7 +29,7 @@ void dump_state(const ClientState *state){
 */
 
 tsize_t _tiffReadProc(thandle_t hdata, tdata_t buf, tsize_t size) {
-	ClientState *state = (ClientState *)hdata;
+	TIFFSTATE *state = (TIFFSTATE *)hdata;
 	tsize_t to_read;
 	
 	TRACE(("_tiffReadProc: %d \n", (int)size));
@@ -51,7 +51,7 @@ tsize_t _tiffWriteProc(thandle_t hdata, tdata_t buf, tsize_t size) {
 }
 
 toff_t _tiffSeekProc(thandle_t hdata, toff_t off, int whence) {
-	ClientState *state = (ClientState *)hdata;
+	TIFFSTATE *state = (TIFFSTATE *)hdata;
 
 	TRACE(("_tiffSeekProc: off: %u whence: %d \n", (uint)off, whence));
 	dump_state(state);
@@ -60,7 +60,7 @@ toff_t _tiffSeekProc(thandle_t hdata, toff_t off, int whence) {
 }
 
 int _tiffCloseProc(thandle_t hdata) {
-	ClientState *state = (ClientState *)hdata;
+	TIFFSTATE *state = (TIFFSTATE *)hdata;
 
 	TRACE(("_tiffCloseProc \n"));
 	dump_state(state);
@@ -72,7 +72,7 @@ int _tiffCloseProc(thandle_t hdata) {
 
 
 toff_t _tiffSizeProc(thandle_t hdata) {
-	ClientState *state = (ClientState *)hdata;
+	TIFFSTATE *state = (TIFFSTATE *)hdata;
 
 	TRACE(("_tiffSizeProc \n"));
 	dump_state(state);
@@ -80,7 +80,7 @@ toff_t _tiffSizeProc(thandle_t hdata) {
 	return (toff_t)state->size;
 }
 int _tiffMapProc(thandle_t hdata, tdata_t* pbase, toff_t* psize) {
-	ClientState *state = (ClientState *)hdata;
+	TIFFSTATE *state = (TIFFSTATE *)hdata;
 
 	TRACE(("_tiffMapProc\n"));
 	dump_state(state);
@@ -96,11 +96,11 @@ void _tiffUnmapProc(thandle_t hdata, tdata_t base, toff_t size) {
 	(void) hdata; (void) base; (void) size;
 }
 
-int ImagingLibTiffInit(ImagingCodecState state, int compression) {
-	ClientState *clientstate = (ClientState *)state->context;
+int ImagingLibTiffInit(ImagingCodecState state, int compression, int fp) {
+	TIFFSTATE *clientstate = (TIFFSTATE *)state->context;
 
     TRACE(("initing libtiff\n"));
-	TRACE(("Compression: %d\n", compression));
+	TRACE(("Compression: %d, filepointer: %d \n", compression, fp));
 	TRACE(("State: count %d, state %d, x %d, y %d, ystep %d\n", state->count, state->state,
 		   state->x, state->y, state->ystep));
 	TRACE(("State: xsize %d, ysize %d, xoff %d, yoff %d \n", state->xsize, state->ysize,
@@ -111,12 +111,13 @@ int ImagingLibTiffInit(ImagingCodecState state, int compression) {
 	clientstate->loc = 0;
 	clientstate->size = 0;
 	clientstate->data = 0;
+	clientstate->fp = fp;
 
     return 1;
 }
 
 int ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int bytes) {
-	ClientState *clientstate = (ClientState *)state->context;
+	TIFFSTATE *clientstate = (TIFFSTATE *)state->context;
 	char *filename = "tempfile.tif";
 	char *mode = "r";
 	TIFF *tiff;
@@ -146,12 +147,17 @@ int ImagingLibTiffDecode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 	clientstate->data = (tdata_t)buffer; 
 
 	dump_state(clientstate);
-	
-	tiff = TIFFClientOpen(filename, mode,
-						  (thandle_t) clientstate,
-						  _tiffReadProc, _tiffWriteProc,
-						  _tiffSeekProc, _tiffCloseProc, _tiffSizeProc,
-						  _tiffMapProc, _tiffUnmapProc);
+	if (clientstate->fp) {
+		TRACE(("Opening using fd: %d\n",clientstate->fp));
+		tiff = TIFFFdOpen(clientstate->fp, filename, mode);
+	} else {  
+		TRACE(("Opening from string\n"));
+		tiff = TIFFClientOpen(filename, mode,
+							  (thandle_t) clientstate,
+							  _tiffReadProc, _tiffWriteProc,
+							  _tiffSeekProc, _tiffCloseProc, _tiffSizeProc,
+							  _tiffMapProc, _tiffUnmapProc);
+	}
 
 	if (!tiff){
 		TRACE(("Error, didn't get the tiff\n"));
