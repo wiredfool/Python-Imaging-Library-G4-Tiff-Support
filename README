@@ -17,15 +17,14 @@ This version includes patches to read Group4 Tiffs using libtiff. See
   - Also works against the 10.04 libtiff4 package, which is actually 
       3.9.6, but reports as 4.3.   
   - It's in debug mode. 
-  - It uses a horrible hack and probably only works on single stripe 
-	  images. Definitely only works on images < 65k
+  - If we've got a file descriptor, we hand that off to libtiff to handle
+      the reading.
 
 + TODO:
   - Windows
   - More test images
   - Cleanup
   - Writing
-  - If we've got a file or fd, let libtiff do the reading instead of us. 
 
 ====
 
