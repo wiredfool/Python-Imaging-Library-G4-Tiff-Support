@@ -127,6 +127,8 @@ COMPRESSION_INFO = {
     32773: "packbits"
 }
 
+COMPRESSION_INFO_REV = dict([(v,k) for (k,v) in COMPRESSION_INFO.items()])
+
 OPEN_INFO = {
     # (ByteOrder, PhotoInterpretation, SampleFormat, FillOrder, BitsPerSample,
     #  ExtraSamples) => mode, rawmode
@@ -855,8 +857,12 @@ def _save(im, fp, filename):
 
     ifd = ImageFileDirectory(prefix)
 
+    compression = im.info.get('compression','raw')
+    libtiff = compression in ["tiff_ccitt", "group3",
+                              "group4", "tiff_raw_16"]
+
     # -- multi-page -- skip TIFF header on subsequent pages
-    if fp.tell() == 0:
+    if not libtiff and fp.tell() == 0:
         # tiff header (write via IFD to get everything right)
         # PIL always starts the first IFD at offset 8
         fp.write(ifd.prefix + ifd.o16(42) + ifd.o32(8))
@@ -933,13 +939,37 @@ def _save(im, fp, filename):
     ifd[ROWSPERSTRIP] = im.size[1]
     ifd[STRIPBYTECOUNTS] = stride * im.size[1]
     ifd[STRIPOFFSETS] = 0 # this is adjusted by IFD writer
-    ifd[COMPRESSION] = 1 # no compression
+    ifd[COMPRESSION] = COMPRESSION_INFO_REV.get(compression,1) # no compression by default
 
-    offset = ifd.save(fp)
+    if libtiff:
+        if Image.DEBUG:
+            print "Saving using libtiff encoder"
+            print ifd.items()
+        _fp = 0
+        if hasattr(fp, "fileno"):
+            fp.seek(0)
+            _fp = os.dup(fp.fileno())
+        
+        atts = dict([(k,v) for (k,(v,)) in ifd.items() if k not in [STRIPOFFSETS,
+																	STRIPBYTECOUNTS]])
+        a = (rawmode, compression, _fp, filename, atts)
+        e = Image._getencoder(im.mode, compression, a, im.encoderconfig)
+        e.setimage(im.im, (0,0)+im.size)
+        while 1:
+            l, s, d = e.encode(16*1024) # undone, change to self.decodermaxblock
+            if not _fp:
+                fp.write(d)
+            if s:
+                break
+        if s < 0:
+            raise IOError("encoder error %d when writing image file" % s)
+        
+    else:
+        offset = ifd.save(fp)
 
-    ImageFile._save(im, fp, [
-        ("raw", (0,0)+im.size, offset, (rawmode, stride, 1))
-        ])
+        ImageFile._save(im, fp, [
+            ("raw", (0,0)+im.size, offset, (rawmode, stride, 1))
+            ])
 
 
     # -- helper for multi-page save --

@@ -402,7 +402,7 @@ PyImaging_LibTiffDecoderNew(PyObject* self, PyObject* args)
     int compression;
 	int fp;
 
-    if (! PyArg_ParseTuple(args, "sss|ii", &mode, &rawmode, &compname, &fp))
+    if (! PyArg_ParseTuple(args, "sssi", &mode, &rawmode, &compname, &fp))
     return NULL;
 
     TRACE(("new tiff decoder %s\n", compname));

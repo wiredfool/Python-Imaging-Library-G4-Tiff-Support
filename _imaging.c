@@ -3128,6 +3128,7 @@ extern PyObject* PyImaging_PcxEncoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_RawEncoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_XbmEncoderNew(PyObject* self, PyObject* args);
 extern PyObject* PyImaging_ZipEncoderNew(PyObject* self, PyObject* args);
+extern PyObject* PyImaging_LibTiffEncoderNew(PyObject* self, PyObject* args);
 
 /* Display support etc (in display.c) */
 #ifdef WIN32
@@ -3181,6 +3182,11 @@ static PyMethodDef functions[] = {
     {"group3_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
     {"group4_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
     {"tiff_raw_16_decoder", (PyCFunction)PyImaging_LibTiffDecoderNew, 1},
+
+    {"tiff_ccitt_encoder", (PyCFunction)PyImaging_LibTiffEncoderNew, 1},
+    {"group3_encoder", (PyCFunction)PyImaging_LibTiffEncoderNew, 1},
+    {"group4_encoder", (PyCFunction)PyImaging_LibTiffEncoderNew, 1},
+    {"tiff_raw_16_encoder", (PyCFunction)PyImaging_LibTiffEncoderNew, 1},
 #endif
     {"msp_decoder", (PyCFunction)PyImaging_MspDecoderNew, 1},
     {"packbits_decoder", (PyCFunction)PyImaging_PackbitsDecoderNew, 1},
