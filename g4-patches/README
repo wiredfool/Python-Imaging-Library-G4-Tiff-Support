@@ -4,11 +4,13 @@ Eric Soroos -- eric@soroos.net -- 3/16/2012
 
 The original patch was on the Image-SIG list in July 2003, included
 here as original-patch.html. I have maintained this patch and compiled
-it against Windows through PIL 1.1.5 and 1.1.6.  I had a need to put
-it on ubuntu 10.04, against PIL 1.1.7 and could not get it to read an
-image without segfaulting. Following some research and code diving,
-the patch uses a ton of internal interfaces from libtiff, and would
-eventually break in exactly this manner.
+it against Windows through PIL 1.1.5 and 1.1.6.
+(http://www.wiredfool.com/2005/10/29/how-to-build-the-python-imaging-library-for-windows/
+http://www.wiredfool.com/2007/03/13/compiling-pil-with-the-g4-tiff-patch-encore/)
+I had a need to put it on ubuntu 10.04, against PIL 1.1.7 and could
+not get it to read an image without segfaulting. Following some
+research and code diving, the patch uses a ton of internal interfaces
+from libtiff, and would eventually break in exactly this manner.
 
 from http://mail.python.org/pipermail/image-sig/2009-May/005698.html
 
