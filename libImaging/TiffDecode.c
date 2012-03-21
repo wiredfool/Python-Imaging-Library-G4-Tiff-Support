@@ -58,6 +58,24 @@ tsize_t _tiffWriteProc(thandle_t hdata, tdata_t buf, tsize_t size) {
 	dump_state(state);
 
 	to_write = min(size, (tsize_t)state->size - state->loc);
+	if (state->flrealloc && size>to_write) {
+		tdata_t new;
+		tsize_t newsize=state->size;
+		while (newsize < (size + state->size)) {
+			newsize += 64*1024;
+			// newsize*=2; // UNDONE, by 64k chunks?
+		}
+		TRACE(("Reallocing in write to %d bytes\n", (int)newsize));
+		new = realloc(state->data, newsize);
+		if (!new) {
+			// fail out
+			return 0;
+		}
+		state->data = new;
+		state->size = newsize;
+		to_write = size;			
+	}
+
 	TRACE(("to_write: %d\n", (int)to_write));
 
 	_TIFFmemcpy(state->data + state->loc, buf, to_write);
@@ -358,6 +376,9 @@ int ImagingLibTiffEncode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 				TRACE(("Encode Error, row %d\n", state->y));
 				state->errcode = IMAGING_CODEC_BROKEN;
 				TIFFClose(tiff);
+				if (!clientstate->fp){
+					free(clientstate->data);
+				}
 				return -1;
 			}
 			state->y++;
@@ -372,6 +393,9 @@ int ImagingLibTiffEncode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 				// likely reason is memory.
 				state->errcode = IMAGING_CODEC_MEMORY;
 				TIFFClose(tiff);
+				if (!clientstate->fp){
+					free(clientstate->data);
+				}
 				return -1;
 			}				
 			TRACE(("Closing \n"));
