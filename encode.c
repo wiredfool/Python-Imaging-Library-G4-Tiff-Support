@@ -624,12 +624,37 @@ PyImaging_LibTiffEncoderNew(PyObject* self, PyObject* args)
 		} else if(PyString_Check(value)) {
 			TRACE(("Setting from String: %d, %s \n", (int)PyInt_AsLong(key),PyString_AsString(value)));
 			status = ImagingLibTiffSetField(&encoder->state, 
-								   (ttag_t) PyInt_AsLong(key),
-								   PyString_AsString(value));
+											(ttag_t) PyInt_AsLong(key),
+											PyString_AsString(value));
 
+		} else if(PyList_Check(value)) {
+			int len,i;
+			float *floatav;
+			TRACE(("Setting from List: %d \n", (int)PyInt_AsLong(key)));
+			len = (int)PyList_Size(value);
+			TRACE((" %d elements, setting as floats \n", len));
+			floatav = malloc(sizeof(float)*len);
+			if (floatav) {
+				for (i=0;i<len;i++) {
+					floatav[i] = (float)PyFloat_AsDouble(PyList_GetItem(value,i));
+				}
+				status = ImagingLibTiffSetField(&encoder->state, 
+												(ttag_t) PyInt_AsLong(key),
+												floatav);
+				free(floatav);
+			}
+		} else if (PyFloat_Check(value)) {
+			TRACE(("Setting from String: %d, %f \n", (int)PyInt_AsLong(key),PyFloat_AsDouble(value)));
+			status = ImagingLibTiffSetField(&encoder->state, 
+											(ttag_t) PyInt_AsLong(key),
+											(float)PyFloat_AsDouble(value));		 
+		} else {
+			TRACE(("Unhandled type for key %d : %s ",  
+				   (int)PyInt_AsLong(key),
+				   PyString_AsString(PyObject_Str(value))));
 		}
 		if (!status) {
-			TRACE(("Error setting Field"));
+			TRACE(("Error setting Field\n"));
 			Py_DECREF(encoder);
 			PyErr_SetString(PyExc_RuntimeError, "Error setting from dictionary");
 			return NULL;

@@ -949,9 +949,37 @@ def _save(im, fp, filename):
         if hasattr(fp, "fileno"):
             fp.seek(0)
             _fp = os.dup(fp.fileno())
-        
-        atts = dict([(k,v) for (k,(v,)) in ifd.items() if k not in [STRIPOFFSETS,
-																	STRIPBYTECOUNTS]])
+
+        blocklist =  [STRIPOFFSETS, STRIPBYTECOUNTS, ROWSPERSTRIP]
+        atts = dict([(k,v) for (k,(v,)) in ifd.items() if k not in blocklist])
+        try:
+            # pull in more bits from the original file, e.g x,y resolution
+            # so that we can save(load('')) == original file.
+            for k,v in im.ifd.items():
+                if k not in atts and k not in blocklist:
+                    if type(v[0]) == tuple and len(v) > 1:
+                       # A tuple of more than one rational tuples
+                        # flatten to floats, following tiffcp.c->cpTag->TIFF_RATIONAL
+                        atts[k] = [float(elt[0])/float(elt[1]) for elt in v]
+                        continue
+                    if type(v[0]) == tuple and len(v) == 1:
+                       # A tuple of one rational tuples
+                        # flatten to floats, following tiffcp.c->cpTag->TIFF_RATIONAL
+                        atts[k] = float(v[0][0])/float(v[0][1])
+                        continue
+                    if type(v) == tuple and len(v) == 1:
+                        # int or similar
+                        atts[k] = v[0]
+                        continue
+                    if type(v) == str:
+                        atts[k] = v
+                        continue
+                    
+        except:
+            # if we don't have an ifd here, just punt.
+            pass
+        if Image.DEBUG:
+            print atts
         a = (rawmode, compression, _fp, filename, atts)
         e = Image._getencoder(im.mode, compression, a, im.encoderconfig)
         e.setimage(im.im, (0,0)+im.size)
