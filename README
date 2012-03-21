@@ -20,13 +20,15 @@ This version includes patches to read Group4 Tiffs using libtiff. See
   - If we've got a file descriptor, we hand that off to libtiff to handle
       the reading.
   - Initial support for writing images. Writing to files of unlimited size
-      works, writing < 64k to memory works. 
+      works, writing > 64k to memory works now too. Obviously, you've got
+	  to have enough memory free to do that, it will kick out a memory
+	  error if not.  
 
 + TODO:
   - Windows
   - More (distributable) test images
   - Cleanup
-  - Writing to memory > 64k encoded size.
+
 
 ====
 
