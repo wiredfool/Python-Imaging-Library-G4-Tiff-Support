@@ -21,6 +21,9 @@
 #define uint64 uint64_t
 #endif
 
+#ifndef uint
+#define uint uint32
+#endif
 
 #include "Tiff.h"
 
@@ -40,10 +43,10 @@ tsize_t _tiffReadProc(thandle_t hdata, tdata_t buf, tsize_t size) {
 	TRACE(("_tiffReadProc: %d \n", (int)size));
 	dump_state(state);
 
-	to_read = min(size, min((tsize_t)state->size, (tsize_t)state->eof) - state->loc);
+	to_read = min(size, min(state->size, (tsize_t)state->eof) - (tsize_t)state->loc);
 	TRACE(("to_read: %d\n", (int)to_read));
 
-	_TIFFmemcpy(buf, state->data + state->loc, to_read);
+	_TIFFmemcpy(buf, (UINT8 *)state->data + state->loc, to_read);
 	state->loc += (toff_t)to_read;
 
 	TRACE( ("location: %u\n", (uint)state->loc));
@@ -57,7 +60,7 @@ tsize_t _tiffWriteProc(thandle_t hdata, tdata_t buf, tsize_t size) {
 	TRACE(("_tiffWriteProc: %d \n", (int)size));
 	dump_state(state);
 
-	to_write = min(size, (tsize_t)state->size - state->loc);
+	to_write = min(size, state->size - (tsize_t)state->loc);
 	if (state->flrealloc && size>to_write) {
 		tdata_t new;
 		tsize_t newsize=state->size;
@@ -78,7 +81,7 @@ tsize_t _tiffWriteProc(thandle_t hdata, tdata_t buf, tsize_t size) {
 
 	TRACE(("to_write: %d\n", (int)to_write));
 
-	_TIFFmemcpy(state->data + state->loc, buf, to_write);
+	_TIFFmemcpy((UINT8 *)state->data + state->loc, buf, to_write);
 	state->loc += (toff_t)to_write;
 	state->eof = max(state->loc, state->eof);
 
