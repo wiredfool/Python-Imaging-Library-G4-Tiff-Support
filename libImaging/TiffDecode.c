@@ -355,7 +355,7 @@ int ImagingLibTiffEncode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 						   state->xsize);
 
 			if (TIFFWriteScanline(tiff, (tdata_t)(state->buffer), (uint32)state->y, 0) == -1) {
-				TRACE(("Decode Error, row %d\n", state->y));
+				TRACE(("Encode Error, row %d\n", state->y));
 				state->errcode = IMAGING_CODEC_BROKEN;
 				TIFFClose(tiff);
 				return -1;
@@ -366,13 +366,19 @@ int ImagingLibTiffEncode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 		if (state->y == state->ysize) {
 			state->state=1;
 
-			TRACE(("Writing Directory \n"));
-			TIFFWriteDirectory(tiff);
+			TRACE(("Flushing \n"));
+			if (!TIFFFlush(tiff)) {
+				TRACE(("Error flushing the tiff"));
+				// likely reason is memory.
+				state->errcode = IMAGING_CODEC_MEMORY;
+				TIFFClose(tiff);
+				return -1;
+			}				
 			TRACE(("Closing \n"));
 			TIFFClose(tiff);
 			// reset the clientstate metadata to use it to read out the buffer.
 			clientstate->loc = 0;
-			clientstate->size = clientstate->eof;
+			clientstate->size = clientstate->eof; // redundant?
 		}
 	}
 
