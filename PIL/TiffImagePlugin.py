@@ -950,7 +950,7 @@ def _save(im, fp, filename):
             fp.seek(0)
             _fp = os.dup(fp.fileno())
 
-        blocklist =  [STRIPOFFSETS, STRIPBYTECOUNTS, ROWSPERSTRIP]
+        blocklist =  [STRIPOFFSETS, STRIPBYTECOUNTS, ROWSPERSTRIP, ICCPROFILE] # ICC Profile crashes.
         atts = dict([(k,v) for (k,(v,)) in ifd.items() if k not in blocklist])
         try:
             # pull in more bits from the original file, e.g x,y resolution
