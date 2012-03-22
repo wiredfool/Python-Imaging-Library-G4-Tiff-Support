@@ -21,6 +21,12 @@
 #ifndef _PIL_LIBTIFF_
 #define _PIL_LIBTIFF_
 
+#ifndef Py_ssize_t
+/* Py_ssize_t is not included in py2.4 */
+#define Py_ssize_t int
+#endif
+
+
 typedef struct {
 	tdata_t data; /* tdata_t == void* */
 	toff_t loc;   /* toff_t == uint32 */
@@ -32,18 +38,25 @@ typedef struct {
 } TIFFSTATE;
 
 
-extern int ImagingLibTiffInit(ImagingCodecState state, int compression, int fp);
 
+extern int ImagingLibTiffInit(ImagingCodecState state, int compression, int fp);
 extern int ImagingLibTiffEncodeInit(ImagingCodecState state, char *filename, int fp);
 extern int ImagingLibTiffSetField(ImagingCodecState state, ttag_t tag, ...);
 
 
+#if defined(_MSC_VER) && (_MSC_VER == 1310)
+/* VS2003/py2.4 can't use varargs. Skipping trace for now.*/
+#define TRACE(args)
+#else 
+
 #define VA_ARGS(...)	__VA_ARGS__
 #define TRACE(args)    fprintf(stderr, VA_ARGS args)
-
 
 /* 
 #define TRACE(args)
 */
+#endif
+
+
 
 #endif
