@@ -347,7 +347,6 @@ int ImagingLibTiffEncode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 
 	TIFFSTATE *clientstate = (TIFFSTATE *)state->context;
 	TIFF *tiff = clientstate->tiff;
-	int linesize = TIFFScanlineSize(tiff);
 	
     TRACE(("in encoder: bytes %d\n", bytes));
 	TRACE(("State: count %d, state %d, x %d, y %d, ystep %d\n", state->count, state->state,
@@ -366,9 +365,8 @@ int ImagingLibTiffEncode(Imaging im, ImagingCodecState state, UINT8* buffer, int
 
 	dump_state(clientstate);
 	
-	TRACE(("ScanlineSize: %d \n", linesize));
-
 	if (state->state == 0) {
+		TRACE(("Encoding line bt line"));
 		while(state->y < state->ysize){
 			state->shuffle(state->buffer,
 						   (UINT8*) im->image[state->y + state->yoff] + 
