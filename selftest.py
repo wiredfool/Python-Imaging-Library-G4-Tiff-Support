@@ -185,6 +185,7 @@ if __name__ == "__main__":
     check_module("TKINTER", "_imagingtk")
     check_codec("JPEG", "jpeg")
     check_codec("ZLIB (PNG/ZIP)", "zip")
+    check_codec("G4 TIFF", "group4")
     check_module("FREETYPE2", "_imagingft")
     check_module("LITTLECMS", "_imagingcms")
     print "-"*68
@@ -200,3 +201,4 @@ if __name__ == "__main__":
         print "--- %s tests passed." % status[1]
 
     sys.exit(exit_status)
+
